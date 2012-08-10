@@ -1,10 +1,31 @@
 package me.grantland.twitter;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.util.HashMap;
+import java.util.Map;
+
+import oauth.signpost.OAuth;
 import oauth.signpost.OAuthConsumer;
 import oauth.signpost.commonshttp.CommonsHttpOAuthConsumer;
+import oauth.signpost.commonshttp.HttpRequestAdapter;
+import oauth.signpost.commonshttp.HttpResponseAdapter;
+import oauth.signpost.exception.OAuthException;
+import oauth.signpost.http.HttpRequest;
+import oauth.signpost.http.HttpResponse;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.util.Log;
+
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicHeader;
 
 /**
  * @author Grantland Chew
@@ -16,6 +37,7 @@ public class Twitter {
     public static final String REQUEST_TOKEN = "https://twitter.com/oauth/request_token";
     public static final String ACCESS_TOKEN = "https://twitter.com/oauth/access_token";
     public static final String AUTHORIZE = "https://twitter.com/oauth/authorize";
+    public static final String DATA_API_URL = "http://api.twitter.com/";
     public static final String DENIED = "denied";
     public static final String CALLBACK_SCHEME = "gc";
     public static final String CALLBACK_URI = CALLBACK_SCHEME + "://twitt";
@@ -29,6 +51,8 @@ public class Twitter {
     // Used as default activityCode by authorize(). See authorize() below.
     public static final int DEFAULT_AUTH_ACTIVITY_CODE = 4242;
 
+    private DefaultHttpClient mHttpClient = null;
+
     private OAuthConsumer mConsumer = null;
 
     private int mRequestCode;
@@ -40,6 +64,10 @@ public class Twitter {
                     "You must specify your consumer key and secret when instantiating " +
                     "a Twitter object. See README for details.");
         }
+
+        mHttpClient = new DefaultHttpClient();
+        mHttpClient.getParams().setBooleanParameter("http.protocol.expect-continue", false);
+
         mConsumer = new CommonsHttpOAuthConsumer(consumerKey, consumerSecret);
     }
 
@@ -137,7 +165,6 @@ public class Twitter {
 
     private boolean startTwitterDialog(Activity activity, String authorizeParams, final DialogListener listener) {
         TwitterDialog dialog = new TwitterDialog(activity, mConsumer, authorizeParams, new DialogListener() {
-            @Override
             public void onComplete(String token, String secret) {
                 if (DEBUG) Log.d(TAG, "access_key: " + token);
                 if (DEBUG) Log.d(TAG, "access_secret: " + secret);
@@ -147,12 +174,10 @@ public class Twitter {
                 listener.onComplete(token, token);
             }
 
-            @Override
             public void onError(TwitterError error) {
                 listener.onError(error);
             }
 
-            @Override
             public void onCancel() {
                 listener.onCancel();
             }
@@ -206,6 +231,85 @@ public class Twitter {
             if (mListener != null) {
                 mListener.onCancel();
             }
+        }
+    }
+
+    /**
+     * Submit a request to the Twitter API. You should have valid authorization before calling
+     * this method.
+     *
+     * @param method HTTP method, should be "GET" or "POST".
+     * @param path Path to API endpoint. For example, "1/statuses/update".
+     * @param parameters Any parameters to submit with the request, as key-value pairs.
+     *                   For example, "status", "Hi!", "include_entities", "true".
+     * @return The response string. This string is expected to be JSON-parsable.
+     */
+    public String request(String method, String path, String... parameters) {
+
+        try {
+            StringBuilder urlBuilder = new StringBuilder();
+            urlBuilder.append(DATA_API_URL);
+            urlBuilder.append(path);
+            urlBuilder.append(".json");
+
+            HttpRequest request = null;
+
+            if (method == "GET") {
+                String glue = "?";
+                for (int i = 0; i < parameters.length - 1; i += 2) {
+                    urlBuilder.append(glue);
+                    urlBuilder.append(OAuth.percentEncode(parameters[i]).getBytes());
+                    urlBuilder.append("=");
+                    urlBuilder.append(OAuth.percentEncode(parameters[i + 1]).getBytes());
+                    glue = "&";
+                }
+
+                HttpGet getRequest = new HttpGet(urlBuilder.toString());
+                request = new HttpRequestAdapter(getRequest);
+            } else if (method == "POST") {
+                HttpPost postRequest = new HttpPost(urlBuilder.toString());
+
+                Map<String, String> map = new HashMap<String, String>();
+                for (int i = 0; i < parameters.length - 1; i += 2) {
+                    map.put(parameters[i], parameters[i + 1]);
+                }
+                StringEntity body = new StringEntity(OAuth.formEncode(map.entrySet()));
+                body.setContentType(new BasicHeader("Content-Type",
+                                                    "application/x-www-form-urlencoded"));
+                postRequest.setEntity(body);
+
+                request = new HttpRequestAdapter(postRequest);
+            } else {
+                if (DEBUG) Log.d(TAG, "Invalid HTTP method: " + method);
+                return "";
+            }
+
+            mConsumer.sign(request);
+
+            HttpResponse response =
+                new HttpResponseAdapter(mHttpClient.execute(((HttpUriRequest) request.unwrap())));
+
+            if (DEBUG) Log.d(TAG, "Response code: " + response.getStatusCode());
+
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(response.getContent()));
+
+            StringBuilder builder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+                builder.append("\n");
+            }
+            return builder.toString();
+        } catch (MalformedURLException exception) {
+            if (DEBUG) Log.d(TAG, "Malformed URL exception: " + exception.toString());
+            return "";
+        } catch (IOException exception) {
+            if (DEBUG) Log.d(TAG, "I/O exception: " + exception.toString());
+            return "";
+        } catch (OAuthException exception) {
+            if (DEBUG) Log.d(TAG, "OAuth exception: " + exception.toString());
+            return "";
         }
     }
 

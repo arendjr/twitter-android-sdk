@@ -5,6 +5,7 @@ import oauth.signpost.OAuthConsumer;
 import oauth.signpost.OAuthProvider;
 import oauth.signpost.commonshttp.CommonsHttpOAuthProvider;
 import oauth.signpost.exception.OAuthException;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
@@ -64,6 +65,7 @@ public class TwitterActivity extends Activity {
     }
 
     @Override
+    @SuppressLint("SetJavaScriptEnabled")
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -84,7 +86,7 @@ public class TwitterActivity extends Activity {
         mSpinner = new ProgressDialog(this);
         mSpinner.setMessage(getResources().getString(R.string.loading_loading));
         mSpinner.setOnCancelListener(new OnCancelListener() {
-            @Override public void onCancel(DialogInterface dialog) {
+            public void onCancel(DialogInterface dialog) {
                 cancel();
             }
         });

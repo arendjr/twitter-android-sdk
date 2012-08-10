@@ -6,6 +6,7 @@ import oauth.signpost.OAuthConsumer;
 import oauth.signpost.OAuthProvider;
 import oauth.signpost.commonshttp.CommonsHttpOAuthProvider;
 import oauth.signpost.exception.OAuthException;
+import android.annotation.SuppressLint;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.content.Context;
@@ -45,10 +46,10 @@ public class TwitterDialog extends Dialog {
 	private static final int BORDER_ALPHA = 126;
 	private static final int BORDER_RADIUS = 10;
 
-    private H mMainThreadHandler;
+    private final H mMainThreadHandler;
 
-    private OAuthConsumer mConsumer;
-    private OAuthProvider mProvider;
+    private final OAuthConsumer mConsumer;
+    private final OAuthProvider mProvider;
 
     private final DialogListener mListener;
 
@@ -127,7 +128,7 @@ public class TwitterDialog extends Dialog {
         mSpinner = new ProgressDialog(getContext());
         mSpinner.setMessage("Loading...");
         mSpinner.setOnCancelListener(new OnCancelListener() {
-            @Override public void onCancel(DialogInterface dialog) {
+            public void onCancel(DialogInterface dialog) {
                 cancel();
             }
         });
@@ -149,7 +150,7 @@ public class TwitterDialog extends Dialog {
         setUpWebView();
 
         setOnCancelListener(new OnCancelListener() {
-            @Override public void onCancel(DialogInterface dialog) {
+            public void onCancel(DialogInterface dialog) {
                 mListener.onCancel();
             }
         });
@@ -177,7 +178,8 @@ public class TwitterDialog extends Dialog {
 	    //mWebView.stopLoading();
 	}
 
-	private void setUpWebView() {
+	@SuppressLint("SetJavaScriptEnabled")
+    private void setUpWebView() {
 	    LayoutInflater inflater = this.getLayoutInflater();
         mWebView = (WebView)inflater.inflate(R.layout.twitter_layout, null);
         mWebView.getSettings().setJavaScriptEnabled(true);
