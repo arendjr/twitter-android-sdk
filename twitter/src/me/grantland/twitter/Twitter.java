@@ -246,6 +246,25 @@ public class Twitter {
      */
     public String request(String method, String path, String... parameters) {
 
+        Map<String, String> parameterMap = new HashMap<String, String>();
+        for (int i = 0; i < parameters.length - 1; i += 2) {
+            parameterMap.put(parameters[i], parameters[i + 1]);
+        }
+
+        return request(method, path, parameterMap);
+    }
+
+    /**
+     * Submit a request to the Twitter API. You should have valid authorization before calling
+     * this method.
+     *
+     * @param method HTTP method, should be "GET" or "POST".
+     * @param path Path to API endpoint. For example, "1/statuses/update".
+     * @param parameters Any parameters to submit with the request, as key-value map.
+     * @return The response string. This string is expected to be JSON-parsable.
+     */
+    public String request(String method, String path, Map<String, String> parameters) {
+
         try {
             StringBuilder urlBuilder = new StringBuilder();
             urlBuilder.append(DATA_API_URL);
@@ -254,26 +273,22 @@ public class Twitter {
 
             HttpRequest request = null;
 
-            if (method == "GET") {
+            if (method.equals("GET")) {
                 String glue = "?";
-                for (int i = 0; i < parameters.length - 1; i += 2) {
+                for (Map.Entry<String, String> entry : parameters.entrySet()) {
                     urlBuilder.append(glue);
-                    urlBuilder.append(OAuth.percentEncode(parameters[i]).getBytes());
+                    urlBuilder.append(OAuth.percentEncode(entry.getKey()).getBytes());
                     urlBuilder.append("=");
-                    urlBuilder.append(OAuth.percentEncode(parameters[i + 1]).getBytes());
+                    urlBuilder.append(OAuth.percentEncode(entry.getValue()).getBytes());
                     glue = "&";
                 }
 
                 HttpGet getRequest = new HttpGet(urlBuilder.toString());
                 request = new HttpRequestAdapter(getRequest);
-            } else if (method == "POST") {
+            } else if (method.equals("POST")) {
                 HttpPost postRequest = new HttpPost(urlBuilder.toString());
 
-                Map<String, String> map = new HashMap<String, String>();
-                for (int i = 0; i < parameters.length - 1; i += 2) {
-                    map.put(parameters[i], parameters[i + 1]);
-                }
-                StringEntity body = new StringEntity(OAuth.formEncode(map.entrySet()));
+                StringEntity body = new StringEntity(OAuth.formEncode(parameters.entrySet()));
                 body.setContentType(new BasicHeader("Content-Type",
                                                     "application/x-www-form-urlencoded"));
                 postRequest.setEntity(body);
